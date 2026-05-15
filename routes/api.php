@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EbookController;
 use App\Http\Controllers\Admin\AdminEbookController;
+use App\Http\Controllers\OrderController;
 
 Route::prefix('v1')->group(function () {
 
@@ -30,4 +31,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('ebooks', AdminEbookController::class);
     });
 
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('orders', [OrderController::class, 'store']);
+        Route::get('orders/{id}', [OrderController::class, 'show']);
+    });
 });
