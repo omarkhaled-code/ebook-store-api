@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EbookController;
 use App\Http\Controllers\Admin\AdminEbookController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
@@ -41,6 +42,9 @@ Route::prefix('v1')->group(function () {
 
         Route::post('downloads/generate/{order_id}', [DownloadController::class, 'generate']);
         Route::get('downloads/{token}', [DownloadController::class, 'stream']);
+
+        
+        Route::get('dashboard/purchases', [DashboardController::class, 'purchases']);
     });
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
