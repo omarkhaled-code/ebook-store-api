@@ -3,63 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ebook;
-use Illuminate\Http\Request;
 
 class EbookController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    // GET /api/v1/ebooks — list all published ebooks
     public function index()
     {
-        //
+        $ebooks = Ebook::where('is_published', true)
+            ->latest()
+            ->paginate(12);
+
+        return response()->json($ebooks);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    // GET /api/v1/ebooks/{slug} — single ebook detail
+    public function show(string $slug)
     {
-        //
-    }
+        $ebook = Ebook::where('slug', $slug)
+            ->where('is_published', true)
+            ->firstOrFail();
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Ebook $ebook)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Ebook $ebook)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Ebook $ebook)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Ebook $ebook)
-    {
-        //
+        return response()->json([
+            'data' => $ebook
+        ]);
     }
 }
