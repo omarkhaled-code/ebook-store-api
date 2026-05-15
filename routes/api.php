@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EbookController;
 use App\Http\Controllers\Admin\AdminEbookController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\WebhookController;
 
 Route::prefix('v1')->group(function () {
 
@@ -34,5 +36,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('orders', [OrderController::class, 'store']);
         Route::get('orders/{id}', [OrderController::class, 'show']);
+        Route::post('payments/initiate', [PaymentController::class, 'initiate']);
     });
+
+    Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
+    ->middleware('verify.paymob.webhook');
 });

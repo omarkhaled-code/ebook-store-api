@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'auth.admin' => \App\Http\Middleware\IsAdmin::class,
+            'verify.paymob.webhook' => \App\Http\Middleware\VerifyPaymobWebhook::class, // 👈
+
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
