@@ -16,6 +16,7 @@ class RegisterController extends Controller
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => Hash::make($request->password),
+            'role'     => 'user',   // 👈 always regular user on register
         ]);
 
         // Create a Sanctum token for this user
@@ -28,6 +29,7 @@ class RegisterController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
+                'role' => $user->role,
             ],
         ], 201);
     }

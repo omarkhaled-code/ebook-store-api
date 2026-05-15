@@ -21,6 +21,10 @@ class Ebook extends Model
         'price_in_cents',
         'is_published',
     ];
+    protected $hidden = [
+        'pdf_path',          // never expose the real file path
+        'price_in_cents',    // frontend only needs formatted price
+    ];
 
     // One ebook has many orders
     public function orders()
