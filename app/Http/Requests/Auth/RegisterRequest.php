@@ -16,11 +16,12 @@ class RegisterRequest extends FormRequest
     // Validation rules
     public function rules(): array
     {
+        
         return [
             'name'     => ['required', 'string', 'max:255'],
             'email'    => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'role' => ['sometimes', 'string', 'in:user,admin'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:8'],
         ];
     }
 
@@ -33,7 +34,6 @@ class RegisterRequest extends FormRequest
             'email.unique'       => 'This email is already registered.',
             'password.required'  => 'Please enter a password.',
             'password.min'       => 'Password must be at least 8 characters.',
-            'password.confirmed' => 'Passwords do not match.',
         ];
     }
 }
