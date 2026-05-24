@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Hash;
 
 class RegisterController extends Controller
@@ -16,8 +17,11 @@ class RegisterController extends Controller
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role'     => 'user',   // 👈 always regular user on register
+            'role'     => 'user',
         ]);
+        event(new Registered($user));
+
+
 
         // Create a Sanctum token for this user
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -30,6 +34,7 @@ class RegisterController extends Controller
                 'name'  => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'email_verified_at' => $user->email_verified_at,
             ],
         ], 201);
     }

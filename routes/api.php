@@ -10,6 +10,9 @@ use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WebhookController;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Auth\Events\Verified;
 
 Route::prefix('v1')->group(function () {
 
@@ -49,4 +52,40 @@ Route::prefix('v1')->group(function () {
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
+});
+
+
+
+
+// Email verification routes
+Route::get('auth/verify-email/{id}/{hash}', function (Request $request) {
+    $user = User::findOrFail($request->route('id'));
+
+    if (!hash_equals(
+        (string) $request->route('hash'),
+        sha1($user->getEmailForVerification())
+    )) {
+        return response()->json(['message' => 'Invalid verification link.'], 403);
+    }
+
+    if ($user->hasVerifiedEmail()) {
+        return response()->json(['message' => 'Email already verified.']);
+    }
+
+    $user->markEmailAsVerified();
+    event(new Verified($user));
+
+    // Redirect to frontend verified page
+    return redirect(env('FRONTEND_URL') . '/auth/verified');
+
+})->middleware(['signed'])->name('verification.verify');
+
+Route::post('auth/resend-verification', function (Request $request) {
+    if ($request->user()->hasVerifiedEmail()) {
+        return response()->json(['message' => 'Email already verified.']);
+    }
+
+    $request->user()->sendEmailVerificationNotification();
+
+    return response()->json(['message' => 'Verification email sent.']);
 });

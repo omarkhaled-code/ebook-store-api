@@ -11,6 +11,15 @@ class OrderController extends Controller
     // POST /api/v1/orders — create a pending order
     public function store(StoreOrderRequest $request)
     {
+        $user = auth()->user();
+
+        if (!$user || !$user->email_verified_at) {
+            return response()->json([
+                'message' => 'Please verify your email before purchasing.',
+                'action'  => 'verify_email',
+            ], 403);
+        }
+
         $ebook = Ebook::findOrFail($request->ebook_id);
 
         // Check if user already purchased this ebook
