@@ -2,23 +2,26 @@
 
 namespace Database\Factories;
 
-use App\Models\Ebook;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
-/**
- * @extends Factory<Ebook>
- */
 class EbookFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
+        $title = fake()->sentence(3);
+
+        $price = fake()->numberBetween(10, 200);
+
         return [
-            //
+            'title' => $title,
+            'slug' => Str::slug($title . '-' . fake()->unique()->numberBetween(1, 9999)),
+            'description' => fake()->paragraph(5),
+            'author' => fake()->name(),
+            'pdf_path' => 'pdfs/sample.pdf',
+            'price' => $price,
+            'price_in_cents' => $price * 100,
+            'is_published' => true,
         ];
     }
 }
