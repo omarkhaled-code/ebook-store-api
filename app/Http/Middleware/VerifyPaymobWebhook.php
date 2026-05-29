@@ -9,43 +9,66 @@ class VerifyPaymobWebhook
 {
     public function handle(Request $request, Closure $next)
     {
-        $hmacSecret  = config('services.paymob.hmac_secret');
+        $hmacSecret   = config('services.paymob.hmac_secret');
         $receivedHmac = $request->query('hmac');
 
+        \Log::info('Webhook HMAC debug', [
+            'received_hmac'  => $receivedHmac,
+            'hmac_secret'    => $hmacSecret,
+            'has_obj'        => $request->has('obj'),
+            'full_data'      => $request->all(),
+        ]);
+
         if (!$receivedHmac) {
+            \Log::error('No HMAC provided');
             return response()->json(['error' => 'No HMAC provided.'], 403);
         }
 
-        $data = $request->all();
 
-        // Paymob requires these fields concatenated in this EXACT order
+        $data = $request->input('obj');
+        
+        if (!$data) {
+            \Log::error('No obj data found');
+            return response()->json(['error' => 'No data provided.'], 403);
+        }
+
+        // Convert booleans to string true/false like Paymob expects
+        $bool = fn($val) => $val ? 'true' : 'false';
+
         $concatenated = implode('', [
             data_get($data, 'amount_cents', ''),
             data_get($data, 'created_at', ''),
             data_get($data, 'currency', ''),
-            data_get($data, 'error_occured', ''),
-            data_get($data, 'has_parent_transaction', ''),
+            $bool(data_get($data, 'error_occured', false)),
+            $bool(data_get($data, 'has_parent_transaction', false)),
             data_get($data, 'id', ''),
             data_get($data, 'integration_id', ''),
-            data_get($data, 'is_3d_secure', ''),
-            data_get($data, 'is_auth', ''),
-            data_get($data, 'is_capture', ''),
-            data_get($data, 'is_refunded', ''),
-            data_get($data, 'is_standalone_payment', ''),
-            data_get($data, 'is_voided', ''),
+            $bool(data_get($data, 'is_3d_secure', false)),
+            $bool(data_get($data, 'is_auth', false)),
+            $bool(data_get($data, 'is_capture', false)),
+            $bool(data_get($data, 'is_refunded', false)),
+            $bool(data_get($data, 'is_standalone_payment', false)),
+            $bool(data_get($data, 'is_voided', false)),
             data_get($data, 'order.id', ''),
             data_get($data, 'owner', ''),
-            data_get($data, 'pending', ''),
+            $bool(data_get($data, 'pending', false)),
             data_get($data, 'source_data.pan', ''),
             data_get($data, 'source_data.sub_type', ''),
             data_get($data, 'source_data.type', ''),
-            data_get($data, 'success', ''),
+            $bool(data_get($data, 'success', false)),
         ]);
 
-        // Compute HMAC using SHA512
+        \Log::info('New concat', ['concat' => $concatenated]);
+
         $computedHmac = hash_hmac('sha512', $concatenated, $hmacSecret);
 
-        // Use hash_equals to prevent timing attacks
+        \Log::info('HMAC comparison', [
+            'computed'  => $computedHmac,
+            'received'  => $receivedHmac,
+            'match'     => hash_equals($computedHmac, $receivedHmac),
+            'concat'    => $concatenated,
+        ]);
+
         if (!hash_equals($computedHmac, $receivedHmac)) {
             return response()->json(['error' => 'Invalid HMAC.'], 403);
         }
