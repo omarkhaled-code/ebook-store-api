@@ -34,6 +34,8 @@ class LoginController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
+                'role'  => $user->role,
+                'email_verified_at' => $user->email_verified_at,
             ],
         ]);
     }
@@ -58,7 +60,7 @@ class LoginController extends Controller
                 'name'  => $user->name,
                 'email' => $user->email,
                 'role'  => $user->role,
-                'email_verified_at' => $user->email_verified_at, 
+                'email_verified_at' => $user->email_verified_at,
 
             ],
         ]);
