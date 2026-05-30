@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\UserSettingsController;
 use App\Http\Controllers\WebhookController;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -39,6 +40,10 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+        // User settings routes
+        Route::put('user/profile', [UserSettingsController::class, 'updateProfile']);
+        Route::put('user/password', [UserSettingsController::class, 'updatePassword']);
+
         Route::post('orders', [OrderController::class, 'store']);
         Route::get('orders/{id}', [OrderController::class, 'show']);
         Route::post('payments/initiate', [PaymentController::class, 'initiate']);
@@ -85,8 +90,3 @@ Route::prefix('v1')->group(function () {
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
 });
-
-
-
-
-
