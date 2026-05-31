@@ -5,6 +5,8 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EbookController;
 use App\Http\Controllers\Admin\AdminEbookController;
+use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\OrderController;
@@ -36,11 +38,17 @@ Route::prefix('v1')->group(function () {
     // Admin ebook routes — must be logged in AND be an admin
     Route::prefix('admin')->middleware(['auth:sanctum', 'auth.admin'])->group(function () {
         Route::apiResource('ebooks', AdminEbookController::class);
+        Route::patch('ebooks/{id}/toggle-publish', [AdminEbookController::class, 'togglePublish']);
+        Route::apiResource('orders', AdminOrderController::class);
     });
+
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('orders', [OrderController::class, 'store']);
         Route::get('orders/{id}', [OrderController::class, 'show']);
+
+
+
         Route::post('payments/initiate', [PaymentController::class, 'initiate']);
 
         Route::post('downloads/generate/{order_id}', [DownloadController::class, 'generate']);
@@ -80,13 +88,12 @@ Route::prefix('v1')->group(function () {
 
             return response()->json(['message' => 'Verification email sent.']);
         });
+
+        Route::get('/messages', [ContactMessageController::class, 'index']);
+        Route::delete('/messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
     });
+    Route::post('/messages', [ContactMessageController::class, 'store']);
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
 });
-
-
-
-
-
