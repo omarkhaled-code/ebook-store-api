@@ -40,7 +40,7 @@ class WebhookController extends Controller
         }
 
         // Mark order as paid
-        Log::info("OBJ: " . json_encode($obj)); // تسجيل البيانات للتأكد من البنية  
+        // Log::info("OBJ: " . json_encode($obj)); // تسجيل البيانات للتأكد من البنية  
         $order->update([
             'status'                => 'paid',
             'paymob_transaction_id' => $obj['id'], // استخدم $obj['id'] بدلاً من $data['id']
