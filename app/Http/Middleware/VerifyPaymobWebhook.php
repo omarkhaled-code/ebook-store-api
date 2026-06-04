@@ -12,12 +12,7 @@ class VerifyPaymobWebhook
         $hmacSecret   = config('services.paymob.hmac_secret');
         $receivedHmac = $request->query('hmac');
 
-        info('Webhook HMAC debug', [
-            'received_hmac'  => $receivedHmac,
-            'hmac_secret'    => $hmacSecret,
-            'has_obj'        => $request->has('obj'),
-            'full_data'      => $request->all(),
-        ]);
+        
 
         if (!$receivedHmac) {
             return response()->json(['error' => 'No HMAC provided.'], 403);
@@ -56,16 +51,10 @@ class VerifyPaymobWebhook
             $bool(data_get($data, 'success', false)),
         ]);
 
-        info('New concat', ['concat' => $concatenated]);
 
         $computedHmac = hash_hmac('sha512', $concatenated, $hmacSecret);
 
-        info('HMAC comparison', [
-            'computed'  => $computedHmac,
-            'received'  => $receivedHmac,
-            'match'     => hash_equals($computedHmac, $receivedHmac),
-            'concat'    => $concatenated,
-        ]);
+       
 
         if (!hash_equals($computedHmac, $receivedHmac)) {
             return response()->json(['error' => 'Invalid HMAC.'], 403);

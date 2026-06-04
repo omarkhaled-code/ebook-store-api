@@ -3,49 +3,50 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\User;
+use App\Notifications\NewOrderNotification;
 use Illuminate\Http\Request;
 
 class WebhookController extends Controller
 {
     public function handlePaymob(Request $request)
     {
-        // الحصول على البيانات المرسلة
-        $data = $request->all();
 
-        // البيانات الأساسية توجد داخل مفتاح 'obj'
-        $obj = $data['obj'] ?? null;
+        $data = $request->input('obj'); // 👈 get the obj key
 
-        if (!$obj) {
-            return response()->json(['status' => 'invalid data'], 400);
+        if (!$data) {
+            return response()->json(['status' => 'no data'], 400);
         }
 
-        // الآن نتحقق من success و pending من داخل الـ obj
-        // ملاحظة: Paymob ترسل success كقيمة منطقية (boolean) وليس نص (string)
-        if ($obj['success'] !== true || $obj['pending'] === true) {
+        // Only process successful, completed transactions
+        if ($data['success'] !== true || $data['pending'] === true) {
             return response()->json(['status' => 'ignored']);
         }
 
-        $paymobOrderId = $obj['order']['id'];
+        $paymobOrderId = $data['order']['id'];
 
-        // Find our order by Paymob's order ID
         $order = Order::where('paymob_order_id', $paymobOrderId)->first();
 
         if (!$order) {
+            // \Log::error('Order not found for paymob_order_id: ' . $paymobOrderId);
             return response()->json(['status' => 'order not found'], 404);
         }
 
-        // Idempotency check
         if ($order->status === 'paid') {
             return response()->json(['status' => 'already processed']);
         }
-
-        // Mark order as paid
-        Log::info("OBJ: " . json_encode($obj)); // تسجيل البيانات للتأكد من البنية  
+        
         $order->update([
             'status'                => 'paid',
-            'paymob_transaction_id' => $obj['id'], // استخدم $obj['id'] بدلاً من $data['id']
+            'paymob_transaction_id' => $data['id'],
             'paid_at'               => now(),
         ]);
+
+        // 👈 Notify all admins
+        $admins = User::where('role', 'admin')->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new NewOrderNotification($order->load(['user', 'ebook'])));
+        }
 
         return response()->json(['status' => 'ok']);
     }
