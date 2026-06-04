@@ -1,0 +1,1143 @@
+<!doctype html><html lang="ar-EG" dir="rtl"><head><meta charset="utf-8"><title>audit-report</title><style>
+@font-face { font-family: NotoArabic; src: url("file:///Users/omarkhaled/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/libreoffice-headless/libreoffice/LibreOfficeDev.app/Contents/Resources/fonts/truetype/NotoNaskhArabic-Regular.ttf"); }
+@font-face { font-family: NotoArabic; src: url("file:///Users/omarkhaled/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/libreoffice-headless/libreoffice/LibreOfficeDev.app/Contents/Resources/fonts/truetype/NotoNaskhArabic-Bold.ttf"); font-weight:700; }
+body { font-family: NotoArabic, Tahoma, Arial, sans-serif; direction: rtl; color:#172033; background:#ffffff; line-height:1.45; margin:30px 42px; }
+h1 { color:#0f4c5c; font-size:26px; border-bottom:3px solid #0e7490; padding:8px 0; margin:28px 0 14px; }
+h2 { color:#0f172a; font-size:19px; margin:22px 0 8px; }
+h2.finding-title { background:#e6f4f7; border-right:7px solid #0e7490; padding:8px 12px; }
+p, li { font-size:12.4px; margin:5px 0; }
+.label { color:#0f4c5c; font-weight:700; margin-top:8px; }
+.sev { display:inline-block; color:#ffffff; padding:4px 9px; font-weight:700; }
+.critical { background:#b42318; } .high { background:#c2410c; } .medium { background:#b7791f; } .low { background:#2563eb; }
+code { direction:ltr; unicode-bidi:embed; background:#edf2ff; color:#1e3a8a; padding:1px 4px; font-family: Menlo, Consolas, monospace; font-size:10.7px; }
+table { width:100%; border-collapse:collapse; margin:10px 0 14px; }
+th { background:#0f4c5c; color:#ffffff; padding:7px; border:1px solid #d8e6ea; }
+td { padding:7px; border:1px solid #d8e6ea; font-size:12px; }
+ul, ol { padding-right:24px; margin:8px 0; }
+</style></head><body><h1>Executive Summary</h1>
+<p>ده تقرير Audit كامل لمشروع Laravel API الخاص بـ ebook store. التقرير معمول بصيغة مناسبة للمراجعة من CTO وLead Backend Engineers وSecurity Team وDevOps Team. الفحص الحالي بيبيّن إن المشروع فيه أساس MVP واضح، لكنه غير جاهز للإنتاج بسبب مشاكل حرجة في payment flow، webhook security، dependency vulnerabilities، testing، deployment readiness، وAPI consistency.</p>
+<p>أهم نقطة: التقرير ده Audit فقط. مفيش source code اتعدل أثناء إنشاء التقرير. الملفات اللي اتعملت هي artifacts المطلوبة: <code dir="ltr">audit-report.md</code> وملف PDF لو التولنج متاح.</p>
+<h2 class="">Scope</h2>
+<ul>
+<li>Project path: <code dir="ltr">/Users/omarkhaled/Projects/ebook-store/ebook-store-api</code></li>
+<li>Date: 2026-06-03</li>
+<li>Runtime timezone: Africa/Cairo</li>
+</ul>
+<h2 class="">Evidence Collected</h2>
+<ul>
+<li>تم فحص <code dir="ltr">app/</code>, <code dir="ltr">routes/</code>, <code dir="ltr">database/</code>, <code dir="ltr">config/</code>, <code dir="ltr">resources/</code>, <code dir="ltr">tests/</code>, <code dir="ltr">bootstrap/</code>, <code dir="ltr">composer.json</code>, <code dir="ltr">composer.lock</code>, ملفات البيئة، وملفات النشر/CI المتاحة.</li>
+<li>الأوامر اللي اتشغلت لل Evidence: <code dir="ltr">php artisan route:list -v</code>, <code dir="ltr">php artisan test</code>, <code dir="ltr">composer validate</code>, <code dir="ltr">composer check-platform-reqs</code>, <code dir="ltr">composer audit --locked</code>, <code dir="ltr">composer outdated --direct --locked</code>, و <code dir="ltr">vendor/bin/pint --test</code>.</li>
+<li><code dir="ltr">composer audit --locked</code> بتاريخ الفحص لقى 9 advisories بتأثر على 7 packages، منها <code dir="ltr">laravel/framework</code> و <code dir="ltr">symfony/mime</code> High severity.</li>
+<li><code dir="ltr">php artisan test</code> نجح، بس الموجود 2 scaffold tests فقط، فده مش معناه إن النظام متغطي وظيفيا أو أمنيا.</li>
+<li><code dir="ltr">vendor/bin/pint --test</code> فشل على ملفات كتير في <code dir="ltr">app/</code>, <code dir="ltr">routes/</code>, <code dir="ltr">database/</code>, و <code dir="ltr">config/</code>.</li>
+<li>مفيش Docker files ولا CI/CD/deployment files واضحة في المشروع حسب الفحص الحالي.</li>
+</ul>
+<h1>Findings Summary</h1>
+<table>
+<tr><th>Severity</th><th>Count</th></tr>
+<tr><td>Critical</td><td>3</td></tr>
+<tr><td>High</td><td>10</td></tr>
+<tr><td>Medium</td><td>18</td></tr>
+<tr><td>Low</td><td>4</td></tr>
+<tr><td>Total</td><td>35</td></tr>
+</table>
+<p>أعلى مخاطر فورية هي: <code dir="ltr">AUD-001</code>, <code dir="ltr">AUD-002</code>, <code dir="ltr">AUD-003</code>, <code dir="ltr">AUD-005</code>, <code dir="ltr">AUD-006</code>, <code dir="ltr">AUD-007</code>, <code dir="ltr">AUD-008</code>, <code dir="ltr">AUD-009</code>, <code dir="ltr">AUD-010</code>, و <code dir="ltr">AUD-022</code>.</p>
+<h1>Architecture Audit</h1>
+<p>المشروع ماشي على Laravel structure الأساسي، بس الـ domain workflows زي checkout/payment/download/admin upload لسه متكتبة مباشرة في controllers أو routes. فيه محاولات جزئية لإدخال <code dir="ltr">Policies</code>, <code dir="ltr">Resources</code>, <code dir="ltr">Enums</code>, و<code dir="ltr">Money</code> support، لكنها مش متوصلة فعليا بالـ controllers بشكل كامل، وده يعمل risk إن الفريق يفتكر إن architecture اتحسنت وهي لسه مش شغالة end-to-end.</p>
+<h2 class="finding-title">Finding ID: AUD-017</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Architecture / Separation of Concerns</p>
+<p class="label">Location:</p>
+<p>Controllers and route closures</p>
+<p class="label">File:</p>
+<p>app/Http/Controllers/OrderController.php</p>
+<p class="label">Line:</p>
+<p>23-50</p>
+<p class="label">Issue Title:</p>
+<p>Business logic كتير جوه controllers/routes</p>
+<p class="label">Problem Description:</p>
+<p>Ordering, payment initiation, webhook processing, download generation, admin upload, وemail verification logic موجودين مباشرة في controllers أو closures.</p>
+<p class="label">Root Cause:</p>
+<p>مفيش application service/action layer واضح للـ domain workflows.</p>
+<p class="label">Technical Impact:</p>
+<p>صعوبة testing، تكرار checks، وزيادة regression risk.</p>
+<p class="label">Business Impact:</p>
+<p>أي تغيير في payment/checkout هيبقى أبطأ وأخطر.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم services/actions متخصصة: <code dir="ltr">CheckoutService</code>, <code dir="ltr">PaymentInitiationService</code>, <code dir="ltr">PaymobWebhookProcessor</code>, <code dir="ltr">DownloadTokenService</code>.</p>
+<p class="label">Implementation Guidance:</p>
+<p>ابدأ بالـ payment/order flows لأنها الأعلى خطورة، واكتب unit tests للخدمات.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev high">High</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-018</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Laravel Best Practices / Authorization</p>
+<p class="label">Location:</p>
+<p>Policies/resources worktree</p>
+<p class="label">File:</p>
+<p>app/Policies/OrderPolicy.php</p>
+<p class="label">Line:</p>
+<p>1</p>
+<p class="label">Issue Title:</p>
+<p>Policies وResources موجودة جزئيا لكن مش متوصلة بالـ controllers</p>
+<p class="label">Problem Description:</p>
+<p>فيه ملفات جديدة تحت <code dir="ltr">app/Policies</code> و <code dir="ltr">app/Http/Resources</code> في worktree، لكن controllers الحالية لسه بترجع raw arrays/models وبتعمل checks يدوية.</p>
+<p class="label">Root Cause:</p>
+<p>Refactor جزئي غير مكتمل ومش متصل بالـ route/controller layer.</p>
+<p class="label">Technical Impact:</p>
+<p>Authorization وresponse serialization مش موحدين، وممكن يبقى فيه إحساس كاذب إن السياسات شغالة.</p>
+<p class="label">Business Impact:</p>
+<p>مراجعة security أصعب، وAPI contract أقل استقرارا.</p>
+<p class="label">Recommended Solution:</p>
+<p>يا إما تكمل wiring رسمي للـ policies/resources، يا إما تشيل refactor الجزئي من branch audit.</p>
+<p class="label">Implementation Guidance:</p>
+<p>استخدم <code dir="ltr">authorize()</code> أو middleware/policies في controllers، واستبدل raw responses بـ <code dir="ltr">JsonResource</code>.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-029</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Source Control / Release Risk</p>
+<p class="label">Location:</p>
+<p>Working tree</p>
+<p class="label">File:</p>
+<p>N/A</p>
+<p class="label">Line:</p>
+<p>N/A</p>
+<p class="label">Issue Title:</p>
+<p>Working tree فيها تغييرات جزئية وملفات untracked</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">git status --short</code> بيعرض source files متغيرة وdirectories جديدة زي <code dir="ltr">app/Enums</code>, <code dir="ltr">app/Policies</code>, <code dir="ltr">app/Http/Resources</code>, بالإضافة لـ <code dir="ltr">load-test.js</code>.</p>
+<p class="label">Root Cause:</p>
+<p>فيه partial refactor/security changes غير مكتملة أو غير committed.</p>
+<p class="label">Technical Impact:</p>
+<p>صعب تعرف baseline الحقيقي، وممكن deploy يضم نصف حل أو ملفات dev.</p>
+<p class="label">Business Impact:</p>
+<p>مخاطر release غير متوقعة ومراجعة أمنية أقل وضوحا.</p>
+<p class="label">Recommended Solution:</p>
+<p>اعمل branch واضح، راجع diff، افصل audit artifacts عن source changes، وامنع untracked dev scripts من الدخول release.</p>
+<p class="label">Implementation Guidance:</p>
+<p>قبل أي deploy: <code dir="ltr">git diff</code>, <code dir="ltr">git status</code>, code review، وCI clean build من commit ثابت.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-033</h2>
+<p class="label">Severity:</p>
+<p class="sev low">Low</p>
+<p class="label">Category:</p>
+<p>Domain Modeling / Type Safety</p>
+<p class="label">Location:</p>
+<p>Models</p>
+<p class="label">File:</p>
+<p>app/Models/Order.php</p>
+<p class="label">Line:</p>
+<p>22-25</p>
+<p class="label">Issue Title:</p>
+<p>Casts/enums ناقصة للـ status, role, money, booleans</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">Order.status</code> string، <code dir="ltr">User.role</code> string، و<code dir="ltr">Ebook.price/is_published</code> مش متcast بشكل واضح في model. فيه enums جديدة في worktree لكن مش مستخدمة.</p>
+<p class="label">Root Cause:</p>
+<p>Domain model لسه بسيط ومش بيستخدم typed invariants.</p>
+<p class="label">Technical Impact:</p>
+<p>مقارنات strings متكررة وأخطاء typo محتملة.</p>
+<p class="label">Business Impact:</p>
+<p>Maintenance أصعب مع توسع الحالات.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم PHP backed enums وcasts للـ money/booleans/status/role.</p>
+<p class="label">Implementation Guidance:</p>
+<p>اربط <code dir="ltr">OrderStatus</code> و<code dir="ltr">UserRole</code> فعليا بالـ casts بعد مراجعة compatibility مع Laravel version.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Long-Term</p>
+<h2 class="finding-title">Finding ID: AUD-034</h2>
+<p class="label">Severity:</p>
+<p class="sev low">Low</p>
+<p class="label">Category:</p>
+<p>Architecture / Repositories</p>
+<p class="label">Location:</p>
+<p>Project structure</p>
+<p class="label">File:</p>
+<p>app/Services/PaymobService.php</p>
+<p class="label">Line:</p>
+<p>7</p>
+<p class="label">Issue Title:</p>
+<p>Repository/query layer مش موجود رغم تكرار query patterns</p>
+<p class="label">Problem Description:</p>
+<p>المشروع مفيهوش repository/query objects. ده مش مشكلة لوحده في مشروع صغير، لكن فيه query patterns متكررة للـ orders/downloads/ebooks.</p>
+<p class="label">Root Cause:</p>
+<p>الاعتماد المباشر على Eloquent داخل controllers/services.</p>
+<p class="label">Technical Impact:</p>
+<p>مع التوسع، filters وauthorization conditions هتتكرر.</p>
+<p class="label">Business Impact:</p>
+<p>سرعة التطوير ممكن تقل مع زيادة features.</p>
+<p class="label">Recommended Solution:</p>
+<p>ماتضيفش repository عام بدون داعي، لكن اعمل query objects/scopes للأماكن المتكررة فعلا.</p>
+<p class="label">Implementation Guidance:</p>
+<p>ابدأ بـ scopes زي <code dir="ltr">paidForUser</code>, <code dir="ltr">pendingForUser</code>, <code dir="ltr">published</code>, وquery object للـ admin order filters.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Long-Term</p>
+<h1>Laravel Best Practices Audit</h1>
+<p>Controllers فيها validation وbusiness logic وresponse formatting في نفس المكان. FormRequests موجودة لبعض flows، لكن admin ebook upload لسه inline. Policies/Resources مش مستخدمة فعليا. Exception handler فاضي. Pint فاشل. ده معناه إن المشروع محتاج standardization قبل أي production push.</p>
+<h2 class="finding-title">Finding ID: AUD-012</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Error Handling / Information Disclosure</p>
+<p class="label">Location:</p>
+<p>Payment and download controllers</p>
+<p class="label">File:</p>
+<p>app/Http/Controllers/PaymentController.php</p>
+<p class="label">Line:</p>
+<p>77-81</p>
+<p class="label">Issue Title:</p>
+<p>API responses بتكشف exception messages للمستخدم</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">PaymentController</code> بيرجع <code dir="ltr">$e-&gt;getMessage()</code>، و<code dir="ltr">DownloadController</code> بيرجع exception message من service.</p>
+<p class="label">Root Cause:</p>
+<p>مفيش exception abstraction أو centralized JSON error rendering.</p>
+<p class="label">Technical Impact:</p>
+<p>ممكن تفاصيل داخلية عن provider/storage/business rules تظهر للعميل.</p>
+<p class="label">Business Impact:</p>
+<p>بتسهّل enumeration/debugging للمهاجم وبتقلل polish بتاع API.</p>
+<p class="label">Recommended Solution:</p>
+<p>ارجع client-safe messages وسجل التفاصيل داخليا.</p>
+<p class="label">Implementation Guidance:</p>
+<p>اعمل custom exceptions زي <code dir="ltr">PaymentProviderException</code> وrender موحد في <code dir="ltr">bootstrap/app.php</code>.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-020</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Error Handling / Observability</p>
+<p class="label">Location:</p>
+<p>Bootstrap exception handler</p>
+<p class="label">File:</p>
+<p>bootstrap/app.php</p>
+<p class="label">Line:</p>
+<p>21-23</p>
+<p class="label">Issue Title:</p>
+<p>Exception handling المركزي فاضي</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">withExceptions</code> فاضي، ومفيش JSON error envelope موحد أو correlation IDs أو custom rendering للـ domain exceptions.</p>
+<p class="label">Root Cause:</p>
+<p>الاعتماد على defaults في API backend.</p>
+<p class="label">Technical Impact:</p>
+<p>Errors هتطلع inconsistent، والمراقبة/debugging أصعب.</p>
+<p class="label">Business Impact:</p>
+<p>وقت أطول لحل incidents وتجربة API أقل احترافية.</p>
+<p class="label">Recommended Solution:</p>
+<p>اعمل centralized JSON exception rendering، logging context، وintegration مع monitoring.</p>
+<p class="label">Implementation Guidance:</p>
+<p>عرف renderers لـ validation/auth/payment/storage exceptions، وضيف request ID في كل response/log.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-023</h2>
+<p class="label">Severity:</p>
+<p class="sev low">Low</p>
+<p class="label">Category:</p>
+<p>Code Quality / Standards</p>
+<p class="label">Location:</p>
+<p>Pint formatting</p>
+<p class="label">File:</p>
+<p>routes/api.php</p>
+<p class="label">Line:</p>
+<p>1</p>
+<p class="label">Issue Title:</p>
+<p><code dir="ltr">vendor/bin/pint --test</code> فشل على أغلب ملفات backend</p>
+<p class="label">Problem Description:</p>
+<p>Pint لقى formatting issues في controllers, models, requests, services, migrations, routes, وconfig.</p>
+<p class="label">Root Cause:</p>
+<p>مفيش formatter gate في workflow/CI.</p>
+<p class="label">Technical Impact:</p>
+<p>Diff noise، صعوبة review، واحتمال style drift.</p>
+<p class="label">Business Impact:</p>
+<p>Maintenance cost أعلى على الفريق.</p>
+<p class="label">Recommended Solution:</p>
+<p>شغل Pint وثبته في CI كـ required check.</p>
+<p class="label">Implementation Guidance:</p>
+<p>اعمل formatting commit منفصل بعد functional/security fixes عشان يبقى review واضح.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-024</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>API Validation / Filtering</p>
+<p class="label">Location:</p>
+<p>Admin order listing</p>
+<p class="label">File:</p>
+<p>app/Http/Controllers/Admin/AdminOrderController.php</p>
+<p class="label">Line:</p>
+<p>14-18</p>
+<p class="label">Issue Title:</p>
+<p>Admin order filter <code dir="ltr">status</code> غير متحقق منه</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">$request-&gt;status</code> بيستخدم مباشرة في <code dir="ltr">where</code> من غير FormRequest أو enum validation.</p>
+<p class="label">Root Cause:</p>
+<p>Filtering اتضاف inline من غير validation layer.</p>
+<p class="label">Technical Impact:</p>
+<p>قيم invalid ممكن ترجع نتائج غلط أو تعمل API contract مش واضح.</p>
+<p class="label">Business Impact:</p>
+<p>Admin reporting غير موثوق.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم FormRequest بقايمة statuses المسموحة وحدد <code dir="ltr">per_page</code> max.</p>
+<p class="label">Implementation Guidance:</p>
+<p>استعمل <code dir="ltr">Rule::in([&quot;pending&quot;, &quot;paid&quot;, &quot;failed&quot;])</code> أو enum.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-035</h2>
+<p class="label">Severity:</p>
+<p class="sev low">Low</p>
+<p class="label">Category:</p>
+<p>Dependency Hygiene</p>
+<p class="label">Location:</p>
+<p>Composer direct dependencies</p>
+<p class="label">File:</p>
+<p>composer.json</p>
+<p class="label">Line:</p>
+<p>10-12</p>
+<p class="label">Issue Title:</p>
+<p>Direct dependencies محتاجة مراجعة production necessity</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">laravel/tinker</code> موجود في <code dir="ltr">require</code> مش <code dir="ltr">require-dev</code>. ده شائع أحيانا، لكن في production security posture الأفضل تقلل الأدوات التفاعلية.</p>
+<p class="label">Root Cause:</p>
+<p>Composer skeleton defaults متسابين من غير dependency minimization review.</p>
+<p class="label">Technical Impact:</p>
+<p>سطح tooling أكبر في production artifact.</p>
+<p class="label">Business Impact:</p>
+<p>مخاطر تشغيل/debug غير مقصود أقل لو اتشالت من production.</p>
+<p class="label">Recommended Solution:</p>
+<p>راجع هل <code dir="ltr">laravel/tinker</code> مطلوب production، ولو لأ انقله لـ <code dir="ltr">require-dev</code>.</p>
+<p class="label">Implementation Guidance:</p>
+<p>بعد النقل شغل <code dir="ltr">composer install --no-dev</code> smoke test في بيئة شبيهة بالproduction.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Long-Term</p>
+<h1>API Audit</h1>
+<p>الـ API عنده version prefix <code dir="ltr">v1</code>، وده كويس كبداية. لكن responses مش موحدة، في endpoints بترجع raw paginator، endpoints بترجع arrays، وendpoints بترجع model مباشرة. كمان فيه endpoints متسجلة ومش implemented، مفيش throttling واضح، ومفيش pagination في بعض list endpoints.</p>
+<h2 class="finding-title">Finding ID: AUD-006</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>API Security / Abuse Protection</p>
+<p class="label">Location:</p>
+<p>API routes</p>
+<p class="label">File:</p>
+<p>routes/api.php</p>
+<p class="label">Line:</p>
+<p>24-25, 58-61, 88-103</p>
+<p class="label">Issue Title:</p>
+<p>مفيش rate limiting واضح على auth و public write endpoints</p>
+<p class="label">Problem Description:</p>
+<p>Routes زي <code dir="ltr">auth/login</code>, <code dir="ltr">auth/register</code>, <code dir="ltr">messages</code>, <code dir="ltr">payments/initiate</code>, <code dir="ltr">downloads/generate</code>, و <code dir="ltr">auth/resend-verification</code> مش ظاهر عليها route-specific throttles.</p>
+<p class="label">Root Cause:</p>
+<p>الـ API متساب على defaults من غير named limiters حسب نوع الخطر.</p>
+<p class="label">Technical Impact:</p>
+<p>Brute force، spam، email abuse، payment provider abuse، وDoS أسهل.</p>
+<p class="label">Business Impact:</p>
+<p>تكلفة تشغيل أعلى، سمعة سيئة للرسائل، ومخاطر account takeover.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف <code dir="ltr">RateLimiter</code> rules في service provider وطبّق <code dir="ltr">throttle:*</code> لكل route حساس.</p>
+<p class="label">Implementation Guidance:</p>
+<p>مثلا login يبقى per email+IP، contact message per IP، payment/download per user، webhook per provider IP/secret مع monitoring.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-009</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>API Correctness / Laravel Routing</p>
+<p class="label">Location:</p>
+<p>Admin order routes</p>
+<p class="label">File:</p>
+<p>routes/api.php</p>
+<p class="label">Line:</p>
+<p>44</p>
+<p class="label">Issue Title:</p>
+<p><code dir="ltr">Route::apiResource(&quot;orders&quot;)</code> بيسجل endpoints مش موجودة في controller</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">AdminOrderController</code> فيه <code dir="ltr">index()</code> بس، لكن <code dir="ltr">apiResource</code> بيسجل <code dir="ltr">store</code>, <code dir="ltr">show</code>, <code dir="ltr">update</code>, و <code dir="ltr">destroy</code>. <code dir="ltr">route:list</code> أكد إنهم registered.</p>
+<p class="label">Root Cause:</p>
+<p>استخدام resource routing قبل تنفيذ كل methods.</p>
+<p class="label">Technical Impact:</p>
+<p>Requests للـ endpoints دي هتؤدي لـ runtime errors أو 500، وده بيكسر admin API contract.</p>
+<p class="label">Business Impact:</p>
+<p>Admin dashboard ممكن يفشل في production، وده يبطّأ operations والدعم.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم <code dir="ltr">-&gt;only([&quot;index&quot;])</code> أو نفذ باقي methods مع validation/policies.</p>
+<p class="label">Implementation Guidance:</p>
+<p>اكتب feature tests لكل admin order route عشان route contract يبقى ثابت.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-015</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Performance / API Design</p>
+<p class="label">Location:</p>
+<p>Dashboard and contact messages</p>
+<p class="label">File:</p>
+<p>app/Http/Controllers/DashboardController.php</p>
+<p class="label">Line:</p>
+<p>12-17</p>
+<p class="label">Issue Title:</p>
+<p>Endpoints بترجع collections غير paginated</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">DashboardController@purchases</code> و <code dir="ltr">ContactMessageController@index</code> بيستخدموا <code dir="ltr">get()</code> من غير pagination.</p>
+<p class="label">Root Cause:</p>
+<p>مفيش API pagination policy موحدة.</p>
+<p class="label">Technical Impact:</p>
+<p>Memory usage وحجم response هيزيدوا مع الوقت.</p>
+<p class="label">Business Impact:</p>
+<p>بطء dashboard/admin inbox وتجربة سيئة.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم <code dir="ltr">paginate()</code> أو cursor pagination حسب الحالة.</p>
+<p class="label">Implementation Guidance:</p>
+<p>حدد <code dir="ltr">per_page</code> بحد أقصى وارجع <code dir="ltr">meta</code> consistent.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-016</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Authentication / Email Verification</p>
+<p class="label">Location:</p>
+<p>Email verification routes</p>
+<p class="label">File:</p>
+<p>routes/api.php</p>
+<p class="label">Line:</p>
+<p>67-86</p>
+<p class="label">Issue Title:</p>
+<p>Email verification route داخل <code dir="ltr">auth:sanctum</code> وبيستخدم <code dir="ltr">env()</code> مباشرة</p>
+<p class="label">Problem Description:</p>
+<p>الـ signed verification route جوه auth middleware، فالمستخدم اللي يفتح email link من browser من غير bearer token ممكن يفشل. كمان redirect بيستخدم <code dir="ltr">env(&quot;FRONTEND_URL&quot;)</code> مباشرة.</p>
+<p class="label">Root Cause:</p>
+<p>Email verification اتعمل كـ closure داخل routes بدل controller/config-driven flow.</p>
+<p class="label">Technical Impact:</p>
+<p>Config cache ممكن يخلي <code dir="ltr">env()</code> unreliable، وverification UX ممكن يتكسر.</p>
+<p class="label">Business Impact:</p>
+<p>مستخدمين مش هيعرفوا يفعّلوا حساباتهم بسهولة، وده يقلل conversion.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم config key للـ frontend URL وخلي signed verification route متاحة بدون bearer auth مع signature check.</p>
+<p class="label">Implementation Guidance:</p>
+<p>انقل logic لـ controller واستخدم Laravel verification conventions واختبارات signed URLs.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-030</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Abuse Protection / Public Forms</p>
+<p class="label">Location:</p>
+<p>Contact message endpoint</p>
+<p class="label">File:</p>
+<p>app/Http/Requests/StoreContactMessageRequest.php</p>
+<p class="label">Line:</p>
+<p>25-29</p>
+<p class="label">Issue Title:</p>
+<p>Contact form مفيهوش spam controls أو max length للرسالة</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">message</code> required string من غير <code dir="ltr">max</code>, والroute public من غير throttle/captcha/honeypot.</p>
+<p class="label">Root Cause:</p>
+<p>Public write endpoint اتعمل minimal validation بس.</p>
+<p class="label">Technical Impact:</p>
+<p>ممكن DB bloat وspam وlarge payload abuse.</p>
+<p class="label">Business Impact:</p>
+<p>Admin inbox يبقى غير قابل للاستخدام وتكلفة تخزين/دعم أعلى.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف rate limit، max length، وربما captcha/honeypot حسب traffic.</p>
+<p class="label">Implementation Guidance:</p>
+<p>مثلا <code dir="ltr">message</code> max 5000، throttle per IP، وتسجيل IP/user agent بشكل privacy-aware لو مطلوب.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h1>Database Audit</h1>
+<p>الـ migrations بسيطة وواضحة، لكن ناقصة constraints وindexes مهمة. أخطر نقطة إن حذف <code dir="ltr">ebooks</code> بيعمل cascade على <code dir="ltr">orders</code>. ده غير مناسب لنظام بيع digital goods لأن purchase history لازم يفضل محفوظ.</p>
+<h2 class="finding-title">Finding ID: AUD-010</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Data Integrity / Audit Trail</p>
+<p class="label">Location:</p>
+<p>Ebook deletion and order FK behavior</p>
+<p class="label">File:</p>
+<p>database/migrations/2026_05_14_122830_create_orders_table.php</p>
+<p class="label">Line:</p>
+<p>17</p>
+<p class="label">Issue Title:</p>
+<p>حذف ebook بيعمل cascade delete للـ orders المرتبطة</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">ebook_id</code> عليه <code dir="ltr">cascadeOnDelete()</code>. <code dir="ltr">AdminEbookController@destroy</code> بيحذف ebook فعليا، فكل purchase history/downloads المرتبطة ممكن تختفي.</p>
+<p class="label">Root Cause:</p>
+<p>استخدام hard delete في domain محتاج audit/history retention.</p>
+<p class="label">Technical Impact:</p>
+<p>فقدان financial records وentitlement records، وصعوبة support/reconciliation.</p>
+<p class="label">Business Impact:</p>
+<p>مخاطر محاسبية وقانونية، ومستخدمين ممكن يفقدوا إثبات الشراء.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم soft deletes أو archive/unpublish بدل delete، وامنع حذف ebook عليه paid orders.</p>
+<p class="label">Implementation Guidance:</p>
+<p>ضيف <code dir="ltr">deleted_at</code> أو <code dir="ltr">archived_at</code>، وسيب orders محفوظة مع snapshot title/price.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-013</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Database Integrity</p>
+<p class="label">Location:</p>
+<p>Orders and downloads migrations</p>
+<p class="label">File:</p>
+<p>database/migrations/2026_05_14_122830_create_orders_table.php</p>
+<p class="label">Line:</p>
+<p>18-19</p>
+<p class="label">Issue Title:</p>
+<p>مفيش unique constraints على provider IDs ولا <code dir="ltr">downloads.order_id</code></p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">paymob_order_id</code>, <code dir="ltr">paymob_transaction_id</code>, و <code dir="ltr">downloads.order_id</code> مش unique. Model relation بتقول hasOne لكن DB مش فارض ده.</p>
+<p class="label">Root Cause:</p>
+<p>Business invariants متسابين في application layer بس.</p>
+<p class="label">Technical Impact:</p>
+<p>Duplicate transactions/download tokens وambiguous webhook matching ممكن يحصلوا.</p>
+<p class="label">Business Impact:</p>
+<p>Entitlement mistakes وpayment reconciliation صعب.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف unique indexes مناسبة مع nullable handling حسب MySQL، وراجع existing data قبل migration.</p>
+<p class="label">Implementation Guidance:</p>
+<p><code dir="ltr">paymob_order_id</code> و<code dir="ltr">paymob_transaction_id</code> unique، و<code dir="ltr">downloads.order_id</code> unique لو فعلا token واحد لكل order.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-014</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Database Performance</p>
+<p class="label">Location:</p>
+<p>Migrations and query patterns</p>
+<p class="label">File:</p>
+<p>database/migrations/2026_05_14_122820_create_ebooks_table.php</p>
+<p class="label">Line:</p>
+<p>24-25</p>
+<p class="label">Issue Title:</p>
+<p>Missing indexes للاستعلامات المتكررة</p>
+<p class="label">Problem Description:</p>
+<p>الاستعلامات بتفلتر على <code dir="ltr">is_published</code>, <code dir="ltr">status</code>, <code dir="ltr">user_id</code>, <code dir="ltr">paymob_order_id</code>, <code dir="ltr">expires_at</code>, و <code dir="ltr">is_read</code> لكن migrations مش عاملة indexes كفاية.</p>
+<p class="label">Root Cause:</p>
+<p>Schema اتعملت MVP بدون query-plan review.</p>
+<p class="label">Technical Impact:</p>
+<p>مع زيادة البيانات، list endpoints/webhooks/downloads هتبقى أبطأ وتضغط DB.</p>
+<p class="label">Business Impact:</p>
+<p>Latency أعلى وتجربة شراء/تحميل أضعف.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف composite indexes مبنية على query patterns.</p>
+<p class="label">Implementation Guidance:</p>
+<p>أمثلة: <code dir="ltr">ebooks(is_published, created_at)</code>, <code dir="ltr">orders(user_id, status, created_at)</code>, <code dir="ltr">orders(paymob_order_id)</code>, <code dir="ltr">downloads(user_id, expires_at)</code>, <code dir="ltr">contact_messages(is_read, created_at)</code>.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h1>Security Audit</h1>
+<p>فيه security gaps حرجة في webhook logging، storage exposure runtime، dependencies، rate limiting، mass assignment، credentials، وdownload token lifecycle. دي نقاط لازم تتقفل قبل production.</p>
+<h2 class="finding-title">Finding ID: AUD-001</h2>
+<p class="label">Severity:</p>
+<p class="sev critical">Critical</p>
+<p class="label">Category:</p>
+<p>Security / DevOps / Storage</p>
+<p class="label">Location:</p>
+<p>Generated filesystem routes and private storage disk</p>
+<p class="label">File:</p>
+<p>config/filesystems.php</p>
+<p class="label">Line:</p>
+<p>33-38</p>
+<p class="label">Issue Title:</p>
+<p>Private storage لسه ظاهر في route table عن طريق <code dir="ltr">storage/{path}</code></p>
+<p class="label">Problem Description:</p>
+<p>رغم إن <code dir="ltr">config/filesystems.php</code> الحالي بيحط <code dir="ltr">serve =&gt; false</code> للـ <code dir="ltr">local</code> disk، نتيجة <code dir="ltr">php artisan route:list -v</code> لسه بتعرض <code dir="ltr">GET storage/{path}</code> و <code dir="ltr">PUT storage/{path}</code> من <code dir="ltr">FilesystemServiceProvider</code>. ده معناه إن runtime أو cached routes/config ممكن يفضل مفعّل direct serving للـ private storage.</p>
+<p class="label">Root Cause:</p>
+<p>فيه عدم اتساق بين source config والـ runtime route table، وغالبا بسبب cached route/config أو route تم توليده قبل تعديل <code dir="ltr">serve</code>.</p>
+<p class="label">Technical Impact:</p>
+<p>ملفات <code dir="ltr">storage/app/private</code> ممكن تتشاف أو تتعامل من route مش داخل <code dir="ltr">DownloadController</code>، وده بيكسر authorization flow الخاص بالـ download token.</p>
+<p class="label">Business Impact:</p>
+<p>تسريب ebooks مدفوعة أو ملفات خاصة ممكن يسبب خسارة مباشرة وثقة أقل ومخاطر قانونية.</p>
+<p class="label">Recommended Solution:</p>
+<p>اتأكد إن <code dir="ltr">serve</code> متعطل فعليا في runtime، امسح وابن cache في deploy pipeline، واقفل أي route مباشر للـ private disk.</p>
+<p class="label">Implementation Guidance:</p>
+<p>راجع <code dir="ltr">php artisan route:list -v</code> بعد <code dir="ltr">config:clear</code>, <code dir="ltr">route:clear</code>, <code dir="ltr">config:cache</code>, <code dir="ltr">route:cache</code>. خليك مع <code dir="ltr">Storage::download()</code> أو signed controller endpoint بس للملفات الخاصة، وماتفعّلش <code dir="ltr">serve</code> على private disks.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-002</h2>
+<p class="label">Severity:</p>
+<p class="sev critical">Critical</p>
+<p class="label">Category:</p>
+<p>Security / Logging / Payments</p>
+<p class="label">Location:</p>
+<p>Paymob webhook verification middleware</p>
+<p class="label">File:</p>
+<p>app/Http/Middleware/VerifyPaymobWebhook.php</p>
+<p class="label">Line:</p>
+<p>15-20, 61-70</p>
+<p class="label">Issue Title:</p>
+<p>Webhook logs بتسجل <code dir="ltr">hmac_secret</code> و payment payload كامل</p>
+<p class="label">Problem Description:</p>
+<p>الكود بيسجل <code dir="ltr">hmac_secret</code>, <code dir="ltr">received_hmac</code>, <code dir="ltr">computed</code>, <code dir="ltr">concat</code>, و <code dir="ltr">full_data</code>. دي أسرار وبيانات دفع حساسة مينفعش تدخل logs.</p>
+<p class="label">Root Cause:</p>
+<p>Debug logging اتساب في middleware حساس بدون redaction أو production guard.</p>
+<p class="label">Technical Impact:</p>
+<p>أي حد عنده log access يقدر يشوف secret أو يعيد بناء توقيع HMAC، وكمان ممكن تظهر بيانات card/source metadata.</p>
+<p class="label">Business Impact:</p>
+<p>اختراق logs ممكن يتحول لاختراق payment flow، وده يعرّض الشركة لمخاطر compliance وfraud.</p>
+<p class="label">Recommended Solution:</p>
+<p>امسح secret/full payload logging، وسجل بس identifiers آمنة زي <code dir="ltr">order.id</code>, <code dir="ltr">transaction id</code>, و status.</p>
+<p class="label">Implementation Guidance:</p>
+<p>استخدم structured logs masked، وخلّي failure logs من غير secrets. ضيف automated test يتأكد إن <code dir="ltr">hmac_secret</code> مش بيظهر في logs.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-005</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Dependency Security</p>
+<p class="label">Location:</p>
+<p>Composer locked dependencies</p>
+<p class="label">File:</p>
+<p>composer.lock</p>
+<p class="label">Line:</p>
+<p>1057, 3988, 4068, 4172, 4252, 4503, 5232</p>
+<p class="label">Issue Title:</p>
+<p><code dir="ltr">composer audit --locked</code> لقى 9 security advisories</p>
+<p class="label">Problem Description:</p>
+<p>الفحص الحالي لقى advisories على <code dir="ltr">laravel/framework</code>, <code dir="ltr">symfony/http-foundation</code>, <code dir="ltr">symfony/http-kernel</code>, <code dir="ltr">symfony/mailer</code>, <code dir="ltr">symfony/mime</code>, <code dir="ltr">symfony/polyfill-intl-idn</code>, و <code dir="ltr">symfony/routing</code>.</p>
+<p class="label">Root Cause:</p>
+<p>الـ lock file قديم نسبيا: <code dir="ltr">laravel/framework</code> locked على <code dir="ltr">13.9.0</code> بينما direct outdated بيقول <code dir="ltr">13.13.0</code> متاح.</p>
+<p class="label">Technical Impact:</p>
+<p>التطبيق معرض لثغرات معروفة، منها CRLF/email injection وSMTP/header injection وrouting/url issues.</p>
+<p class="label">Business Impact:</p>
+<p>مخاطر security incident وcompliance failure لو اتنشر بنفس dependencies.</p>
+<p class="label">Recommended Solution:</p>
+<p>حدّث Laravel/Symfony patches بأسرع وقت وشغّل regression tests و<code dir="ltr">composer audit --locked</code> بعد التحديث.</p>
+<p class="label">Implementation Guidance:</p>
+<p>استخدم <code dir="ltr">composer update laravel/framework symfony/* --with-all-dependencies</code> في branch منفصل، وبعدها full test suite وsmoke tests للـ auth/payment/email.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-007</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Authorization / Mass Assignment</p>
+<p class="label">Location:</p>
+<p>User model and register validation</p>
+<p class="label">File:</p>
+<p>app/Models/User.php</p>
+<p class="label">Line:</p>
+<p>16</p>
+<p class="label">Issue Title:</p>
+<p><code dir="ltr">User</code> model بيسمح mass assignment لـ <code dir="ltr">role</code> و <code dir="ltr">email_verified_at</code></p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">#[Fillable]</code> فيه <code dir="ltr">role</code> و <code dir="ltr">email_verified_at</code>. كمان <code dir="ltr">RegisterRequest</code> بيقبل <code dir="ltr">role</code> في validation على line 23. صحيح controller حاليا بيجبر role على <code dir="ltr">user</code>، بس model نفسه خطر للمستقبل.</p>
+<p class="label">Root Cause:</p>
+<p>خلط admin-managed fields مع user-managed fields في fillable.</p>
+<p class="label">Technical Impact:</p>
+<p>أي endpoint مستقبلي يستخدم <code dir="ltr">User::create($request-&gt;validated())</code> أو <code dir="ltr">update()</code> ممكن يدي admin أو verified state بالغلط.</p>
+<p class="label">Business Impact:</p>
+<p>Privilege escalation أو bypass email verification.</p>
+<p class="label">Recommended Solution:</p>
+<p>شيل <code dir="ltr">role</code> و <code dir="ltr">email_verified_at</code> من public fillable، وخلي تغيير role في admin-only service/policy.</p>
+<p class="label">Implementation Guidance:</p>
+<p>اعمل tests تثبت إن register/profile update ماينفعش يغير role أو verification state مباشرة.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-008</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Security / Secrets / Test Data</p>
+<p class="label">Location:</p>
+<p>Seeder and load test script</p>
+<p class="label">File:</p>
+<p>database/seeders/DatabaseSeeder.php</p>
+<p class="label">Line:</p>
+<p>21-32</p>
+<p class="label">Issue Title:</p>
+<p>Admin/User seeded credentials ضعيفة ومكررة في <code dir="ltr">load-test.js</code></p>
+<p class="label">Problem Description:</p>
+<p>Seeder بيخلق <code dir="ltr">admin@example.com</code> و <code dir="ltr">user@example.com</code> بكلمة سر <code dir="ltr">passpass</code>، و<code dir="ltr">load-test.js</code> بيحط نفس credentials hardcoded.</p>
+<p class="label">Root Cause:</p>
+<p>بيانات dev/test مش مفصولة بوضوح عن production seeding، وload testing script فيه secrets ثابتة.</p>
+<p class="label">Technical Impact:</p>
+<p>لو seeder اتشغل في staging/production أو الملف اتشارك، takeover بسيط جدا.</p>
+<p class="label">Business Impact:</p>
+<p>اختراق admin account ممكن يدي تحكم كامل في ebooks/orders.</p>
+<p class="label">Recommended Solution:</p>
+<p>خلي seeders dev-only، واستخدم env-generated one-time admin credentials أو command آمن.</p>
+<p class="label">Implementation Guidance:</p>
+<p>افصل <code dir="ltr">LocalDatabaseSeeder</code> عن production، وحط guard <code dir="ltr">app()-&gt;environment(&quot;local&quot;, &quot;testing&quot;)</code>.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h2 class="finding-title">Finding ID: AUD-027</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Session / Cookie Security</p>
+<p class="label">Location:</p>
+<p>Session config and <code dir="ltr">.env</code></p>
+<p class="label">File:</p>
+<p>config/session.php</p>
+<p class="label">Line:</p>
+<p>50, 172, 202</p>
+<p class="label">Issue Title:</p>
+<p>Session encryption/secure cookie مش مفروضين افتراضيا</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">SESSION_ENCRYPT=false</code> في env، و<code dir="ltr">SESSION_SECURE_COOKIE</code> مش متحدد. SameSite default <code dir="ltr">lax</code> كويس لبعض الحالات لكن محتاج review مع SPA domain.</p>
+<p class="label">Root Cause:</p>
+<p>Production session policy مش محددة في repo.</p>
+<p class="label">Technical Impact:</p>
+<p>Cookies ممكن تتنقل بدون secure flag لو config غلط، وsession payload مش encrypted.</p>
+<p class="label">Business Impact:</p>
+<p>مخاطر session compromise أعلى.</p>
+<p class="label">Recommended Solution:</p>
+<p>في production استخدم HTTPS-only secure cookies وsession encryption حسب architecture.</p>
+<p class="label">Implementation Guidance:</p>
+<p>حدد <code dir="ltr">SESSION_SECURE_COOKIE=true</code>, راجع <code dir="ltr">SESSION_DOMAIN</code>, <code dir="ltr">SANCTUM_STATEFUL_DOMAINS</code>, وCORS/CSRF setup.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-031</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Download Security / Race Conditions</p>
+<p class="label">Location:</p>
+<p>Download token service</p>
+<p class="label">File:</p>
+<p>app/Services/DownloadService.php</p>
+<p class="label">Line:</p>
+<p>24-33</p>
+<p class="label">Issue Title:</p>
+<p>Download token recreation مش transactional ومفيش single-use enforcement</p>
+<p class="label">Problem Description:</p>
+<p>الخدمة بتحذف token قديم وتنشئ جديد من غير transaction أو lock، و<code dir="ltr">stream</code> بيعلّم <code dir="ltr">downloaded_at</code> بس مش بيمنع reuse قبل expiry.</p>
+<p class="label">Root Cause:</p>
+<p>Token lifecycle business rules مش محددة في DB/service بشكل قوي.</p>
+<p class="label">Technical Impact:</p>
+<p>Race conditions أو multiple valid downloads حسب التوقيت، وtoken reuse خلال 24 ساعة.</p>
+<p class="label">Business Impact:</p>
+<p>مشاركة روابط تحميل مدفوعة ممكن تزيد.</p>
+<p class="label">Recommended Solution:</p>
+<p>حدد policy: single-use أو limited-use، وطبقها transactionally.</p>
+<p class="label">Implementation Guidance:</p>
+<p>استخدم row lock على order/download، وcheck <code dir="ltr">downloaded_at</code> لو single-use مطلوب، واختبر concurrent requests.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h1>Performance Audit</h1>
+<p>الأداء حاليا مقبول لأن المشروع صغير، لكن مش scalable: مفيش indexes كفاية، فيه <code dir="ltr">get()</code> بدون pagination، provider calls synchronous، ومفيش queue jobs فعلية.</p>
+<h2 class="finding-title">Finding ID: AUD-011</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Reliability / External Integrations</p>
+<p class="label">Location:</p>
+<p>Paymob service</p>
+<p class="label">File:</p>
+<p>app/Services/PaymobService.php</p>
+<p class="label">Line:</p>
+<p>23-24, 37-50, 66-74</p>
+<p class="label">Issue Title:</p>
+<p>Paymob HTTP calls من غير timeout أو retry أو circuit handling</p>
+<p class="label">Problem Description:</p>
+<p>كل <code dir="ltr">Http::post()</code> calls بتتنفذ بدون <code dir="ltr">timeout()</code>, <code dir="ltr">connectTimeout()</code>, <code dir="ltr">retry()</code>, أو provider-specific error mapping.</p>
+<p class="label">Root Cause:</p>
+<p>Integration service معمول بشكل مباشر وبسيط من غير resilience patterns.</p>
+<p class="label">Technical Impact:</p>
+<p>API request ممكن يعلق أو يفشل مؤقتا من غير retry، وممكن يضغط PHP workers.</p>
+<p class="label">Business Impact:</p>
+<p>Checkout failures، abandoned purchases، ودعم عملاء أكتر.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف timeouts قصيرة، retries محسوبة، logging آمن، وjob/reconciliation fallback.</p>
+<p class="label">Implementation Guidance:</p>
+<p>مثلا <code dir="ltr">Http::timeout(10)-&gt;connectTimeout(3)-&gt;retry(2, 200)</code> مع exceptions داخلية آمنة.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-021</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Queues / Scalability</p>
+<p class="label">Location:</p>
+<p>Queue configuration and app behavior</p>
+<p class="label">File:</p>
+<p>config/queue.php</p>
+<p class="label">Line:</p>
+<p>16-45</p>
+<p class="label">Issue Title:</p>
+<p>Queue infrastructure موجودة لكن مفيش custom Jobs ولا async payment/email workflows</p>
+<p class="label">Problem Description:</p>
+<p>فيه queue tables/config، لكن مفيش <code dir="ltr">app/Jobs</code> ولا usage واضح لـ queued workflows. Payment provider calls والإيميلات بتتنفذ inline.</p>
+<p class="label">Root Cause:</p>
+<p>MVP implementation بدون async boundary.</p>
+<p class="label">Technical Impact:</p>
+<p>Requests هتفضل مرتبطة بزمن provider/mail، ومفيش retries منظمة.</p>
+<p class="label">Business Impact:</p>
+<p>Checkout latency أعلى وفشل مؤقت يتحول لفشل مستخدم نهائي.</p>
+<p class="label">Recommended Solution:</p>
+<p>انقل email sending, payment reconciliation, cleanup, وnotifications لـ jobs.</p>
+<p class="label">Implementation Guidance:</p>
+<p>استخدم <code dir="ltr">ShouldQueue</code>, failed job monitoring, retry/backoff, وworkers managed بـ Supervisor/Horizon-like process.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-032</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>File Delivery / Reliability</p>
+<p class="label">Location:</p>
+<p>Download streaming</p>
+<p class="label">File:</p>
+<p>app/Http/Controllers/DownloadController.php</p>
+<p class="label">Line:</p>
+<p>65-82</p>
+<p class="label">Issue Title:</p>
+<p>Manual file streaming fragile ومش بيستخدم Storage API بشكل كامل</p>
+<p class="label">Problem Description:</p>
+<p>الكود بيطلع absolute path ويستخدم <code dir="ltr">file_exists</code>, <code dir="ltr">fopen</code>, <code dir="ltr">fread</code>, <code dir="ltr">flush</code> manually. مفيش handling لو <code dir="ltr">fopen</code> فشل، وفيه lazy relation access <code dir="ltr">$download-&gt;order-&gt;ebook</code>.</p>
+<p class="label">Root Cause:</p>
+<p>File delivery معمول يدوي بدل framework/storage response.</p>
+<p class="label">Technical Impact:</p>
+<p>Warnings/partial downloads ونقاط فشل مش متغطية، واحتمال N+1 لو اتوسع.</p>
+<p class="label">Business Impact:</p>
+<p>تجربة تحميل غير مستقرة ودعم أعلى.</p>
+<p class="label">Recommended Solution:</p>
+<p>استخدم <code dir="ltr">Storage::disk(&quot;local&quot;)-&gt;download()</code> أو streamed response آمن مع error handling.</p>
+<p class="label">Implementation Guidance:</p>
+<p>اعمل eager load لـ <code dir="ltr">order.ebook</code>, check existence عبر disk، وسجل failure sanitized.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h1>Error Handling Audit</h1>
+<p>Error handling الحالي مش موحد، وفيه exception messages بتطلع للعميل. كمان logging يا إما زيادة وخطر في webhook يا إما ناقص في payment/admin operations.</p>
+<h2 class="finding-title">Finding ID: AUD-028</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Observability / Audit Logging</p>
+<p class="label">Location:</p>
+<p>Payment/admin operations</p>
+<p class="label">File:</p>
+<p>app/Http/Controllers/Admin/AdminEbookController.php</p>
+<p class="label">Line:</p>
+<p>45-55, 99-109</p>
+<p class="label">Issue Title:</p>
+<p>مفيش audit trail للأفعال الحساسة</p>
+<p class="label">Problem Description:</p>
+<p>إنشاء/تعديل/حذف ebooks، payment initiation، webhook paid transition، وdownload events مفيهاش audit logs آمنة ومهيكلة.</p>
+<p class="label">Root Cause:</p>
+<p>Logging يا إما debug secrets في webhook يا إما مش موجود في باقي flows.</p>
+<p class="label">Technical Impact:</p>
+<p>صعب تعرف مين غيّر إيه أو تشخص fraud/support cases.</p>
+<p class="label">Business Impact:</p>
+<p>Security team وsupport هيواجهوا صعوبة في التحقيقات.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف audit events/logs sanitized للأفعال الحساسة.</p>
+<p class="label">Implementation Guidance:</p>
+<p>سجل admin user id, action, resource id, order id, provider transaction id، من غير secrets أو PII زيادة.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h1>Testing Audit</h1>
+<p>التستات الحالية مش بتغطي أي business/security behavior حقيقي. نجاح test suite الحالي misleading لأنه بيقيس scaffold فقط.</p>
+<h2 class="finding-title">Finding ID: AUD-022</h2>
+<p class="label">Severity:</p>
+<p class="sev high">High</p>
+<p class="label">Category:</p>
+<p>Testing / Quality Gates</p>
+<p class="label">Location:</p>
+<p>Test suite</p>
+<p class="label">File:</p>
+<p>tests/Feature/ExampleTest.php</p>
+<p class="label">Line:</p>
+<p>13-17</p>
+<p class="label">Issue Title:</p>
+<p>Test suite عبارة عن scaffold tests فقط</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">php artisan test</code> بيعدي 2 tests بس: واحدة للـ <code dir="ltr">/</code> وواحدة <code dir="ltr">true is true</code>. مفيش tests للـ auth, orders, payments, webhooks, downloads, admin authorization, validation, أو security.</p>
+<p class="label">Root Cause:</p>
+<p>مفيش testing strategy للـ backend domain.</p>
+<p class="label">Technical Impact:</p>
+<p>أي regression في payment/security ممكن يعدي CI لو موجود.</p>
+<p class="label">Business Impact:</p>
+<p>مخاطر production incidents عالية جدا.</p>
+<p class="label">Recommended Solution:</p>
+<p>ابني feature/unit test suite حول أعلى flows خطورة.</p>
+<p class="label">Implementation Guidance:</p>
+<p>ابدأ بـ Paymob HMAC, amount mismatch, admin access, duplicate purchases, download ownership, and validation/rate limiting.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev high">High</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h1>Dependency Audit</h1>
+<p><code dir="ltr">composer.json</code> valid وplatform requirements ناجحة، لكن security audit فشل بمعنى إنه لقى advisories فعلية، وdirect outdated بيقول إن <code dir="ltr">laravel/framework</code> محتاج patch update.</p>
+<h1>DevOps &amp; Production Readiness Audit</h1>
+<p>مفيش Docker/CI/CD/deployment manifests. <code dir="ltr">.env.example</code> local-biased وناقص production contract. في active <code dir="ltr">.env</code> قيم محلية زي <code dir="ltr">APP_DEBUG=true</code>, <code dir="ltr">MAIL_MAILER=log</code>, وdatabase-backed queue/cache. لازم يتعمل deployment checklist وCI gate قبل production.</p>
+<h2 class="finding-title">Finding ID: AUD-025</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>DevOps / Delivery</p>
+<p class="label">Location:</p>
+<p>Project root</p>
+<p class="label">File:</p>
+<p>N/A</p>
+<p class="label">Line:</p>
+<p>N/A</p>
+<p class="label">Issue Title:</p>
+<p>مفيش Docker/CI/CD/deployment files واضحة</p>
+<p class="label">Problem Description:</p>
+<p>الفحص ملقاش <code dir="ltr">Dockerfile</code>, <code dir="ltr">docker-compose</code>, <code dir="ltr">.github/workflows</code>, <code dir="ltr">.gitlab-ci.yml</code>, أو deploy manifests.</p>
+<p class="label">Root Cause:</p>
+<p>مشروع backend لسه مفيهوش delivery automation ظاهرة في repo.</p>
+<p class="label">Technical Impact:</p>
+<p>مفيش automated checks للتستات، Pint، composer audit، migrations، build، أو deploy repeatability.</p>
+<p class="label">Business Impact:</p>
+<p>Deployments يدوية ومعرضة للأخطاء، وصعب تعمل compliance evidence.</p>
+<p class="label">Recommended Solution:</p>
+<p>ضيف CI pipeline وcontainer/deploy docs حسب بيئة الاستضافة.</p>
+<p class="label">Implementation Guidance:</p>
+<p>أقل pipeline: install deps, validate composer, run Pint, tests, composer audit, npm build, cache config/routes في release step.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Priority:</p>
+<p>Short-Term</p>
+<h2 class="finding-title">Finding ID: AUD-026</h2>
+<p class="label">Severity:</p>
+<p class="sev medium">Medium</p>
+<p class="label">Category:</p>
+<p>Environment / Configuration</p>
+<p class="label">Location:</p>
+<p>Environment example and active env</p>
+<p class="label">File:</p>
+<p>.env.example</p>
+<p class="label">Line:</p>
+<p>1-73</p>
+<p class="label">Issue Title:</p>
+<p><code dir="ltr">.env.example</code> local-biased وناقص production/security keys</p>
+<p class="label">Problem Description:</p>
+<p><code dir="ltr">.env.example</code> فيه <code dir="ltr">APP_DEBUG=true</code>, <code dir="ltr">APP_ENV=local</code>, <code dir="ltr">MAIL_MAILER=log</code>, <code dir="ltr">SESSION_ENCRYPT=false</code>, ومفيهوش Paymob/Sanctum production keys المطلوبة.</p>
+<p class="label">Root Cause:</p>
+<p>Environment contract مش موثق كفاية للـ production.</p>
+<p class="label">Technical Impact:</p>
+<p>Deploy ممكن يطلع ناقص secrets أو بإعدادات dev.</p>
+<p class="label">Business Impact:</p>
+<p>فشل email/payment أو تسريب debug details لو اتنسخت القيم.</p>
+<p class="label">Recommended Solution:</p>
+<p>حدث env template بقيم placeholders آمنة وقايمة required variables.</p>
+<p class="label">Implementation Guidance:</p>
+<p>ضيف <code dir="ltr">PAYMOB_API_KEY</code>, <code dir="ltr">PAYMOB_HMAC_SECRET</code>, <code dir="ltr">PAYMOB_INTEGRATION_ID</code>, <code dir="ltr">SANCTUM_STATEFUL_DOMAINS</code>, <code dir="ltr">SESSION_SECURE_COOKIE</code>, <code dir="ltr">LOG_LEVEL</code>, queue/cache drivers.</p>
+<p class="label">Estimated Fix Effort:</p>
+<p class="sev low">Low</p>
+<p class="label">Priority:</p>
+<p>Immediate</p>
+<h1>Top 20 Security Issues</h1>
+<ol>
+<li>1. <code dir="ltr">storage/{path}</code> routes ظاهرة في runtime رغم private storage intent.</li>
+<li>2. <code dir="ltr">hmac_secret</code> وpayment payload بيتسجلوا في logs.</li>
+<li>3. Payment amount بيتحسب من ebook price الحالي بدل order snapshot.</li>
+<li>4. Webhook مش بيتحقق من amount/currency/integration/refund/void flags.</li>
+<li>5. <code dir="ltr">composer audit --locked</code> لقى 9 advisories.</li>
+<li>6. مفيش route-specific throttling على auth/public write/payment endpoints.</li>
+<li>7. <code dir="ltr">User</code> fillable بيسمح <code dir="ltr">role</code> و<code dir="ltr">email_verified_at</code>.</li>
+<li>8. <code dir="ltr">RegisterRequest</code> بيقبل <code dir="ltr">role</code> من العميل.</li>
+<li>9. Seeded admin/user credentials ضعيفة.</li>
+<li>10. <code dir="ltr">load-test.js</code> فيه credentials hardcoded.</li>
+<li>11. Admin order resource routes غير implemented.</li>
+<li>12. Ebook delete بيعمل cascade على paid orders.</li>
+<li>13. Sanctum token abilities مش scoped في login/register.</li>
+<li>14. Webhook processing مش transactional.</li>
+<li>15. Missing unique provider transaction constraints.</li>
+<li>16. Contact form معرض للـ spam/large payloads.</li>
+<li>17. Download tokens reusable طول فترة expiry.</li>
+<li>18. Session secure/encrypted production policy مش موثقة.</li>
+<li>19. Exception messages بتطلع للعميل.</li>
+<li>20. مفيش centralized audit trail للأفعال الحساسة.</li>
+</ol>
+<h1>Top 20 Performance Issues</h1>
+<ol>
+<li>1. Paymob HTTP calls بدون timeout.</li>
+<li>2. Paymob HTTP calls بدون retry/backoff.</li>
+<li>3. Checkout synchronous بالكامل.</li>
+<li>4. <code dir="ltr">dashboard/purchases</code> غير paginated.</li>
+<li>5. <code dir="ltr">messages</code> غير paginated.</li>
+<li>6. Missing index على <code dir="ltr">orders.paymob_order_id</code>.</li>
+<li>7. Missing index على <code dir="ltr">orders(user_id, status, created_at)</code>.</li>
+<li>8. Missing index على <code dir="ltr">ebooks(is_published, created_at)</code>.</li>
+<li>9. Missing index على <code dir="ltr">downloads(user_id, expires_at)</code>.</li>
+<li>10. Missing index على <code dir="ltr">contact_messages(is_read, created_at)</code>.</li>
+<li>11. Manual PDF streaming بدل optimized storage responses.</li>
+<li>12. Lazy relation access في download streaming.</li>
+<li>13. Database cache store ممكن يبقى bottleneck.</li>
+<li>14. Database queue store بدون workers/monitoring واضح.</li>
+<li>15. مفيش caching للـ public ebook listings.</li>
+<li>16. مفيش query scopes منظمة.</li>
+<li>17. Admin filters غير validated وممكن تعمل inefficient queries مستقبلا.</li>
+<li>18. File upload flow مفيهوش async scan/processing.</li>
+<li>19. No load-test integration في CI.</li>
+<li>20. No observability metrics لزمن payment/download endpoints.</li>
+</ol>
+<h1>Top 20 Refactoring Opportunities</h1>
+<ol>
+<li>1. <code dir="ltr">CheckoutService</code> لإنشاء orders وتثبيت amount snapshot.</li>
+<li>2. <code dir="ltr">PaymentInitiationService</code> لفصل provider calls.</li>
+<li>3. <code dir="ltr">PaymobWebhookProcessor</code> للتحقق والتحديث transactionally.</li>
+<li>4. <code dir="ltr">DownloadTokenService</code> بسياسة token واضحة.</li>
+<li>5. <code dir="ltr">EbookManagementService</code> للـ upload/delete/archive.</li>
+<li>6. Controller للـ email verification بدل route closure.</li>
+<li>7. API Resources موحدة لكل responses.</li>
+<li>8. Policies متوصلة فعليا بدل checks يدوية.</li>
+<li>9. Enums/Casts للـ <code dir="ltr">OrderStatus</code> و<code dir="ltr">UserRole</code>.</li>
+<li>10. Query scopes للـ paid/pending/published filters.</li>
+<li>11. FormRequests لكل admin filters/uploads.</li>
+<li>12. Centralized JSON error renderer.</li>
+<li>13. Audit logging service للأفعال الحساسة.</li>
+<li>14. Jobs للـ emails/reconciliation/cleanup.</li>
+<li>15. Soft delete/archive للـ ebooks.</li>
+<li>16. Money ValueObject للـ cents conversion.</li>
+<li>17. Remove or gate dev seeders.</li>
+<li>18. Move load testing config to env variables.</li>
+<li>19. Separate formatting-only cleanup commit.</li>
+<li>20. Add CI quality gates.</li>
+</ol>
+<h1>Database Optimization Recommendations</h1>
+<ul>
+<li>ضيف unique index على <code dir="ltr">orders.paymob_order_id</code> بعد تنظيف البيانات القديمة.</li>
+<li>ضيف unique index على <code dir="ltr">orders.paymob_transaction_id</code> لو provider transaction unique مضمون.</li>
+<li>ضيف unique index على <code dir="ltr">downloads.order_id</code> لو business rule هو token واحد لكل order.</li>
+<li>ضيف composite index على <code dir="ltr">orders(user_id, status, created_at)</code>.</li>
+<li>ضيف index على <code dir="ltr">orders(paymob_order_id)</code> لاستخدام webhook lookup.</li>
+<li>ضيف composite index على <code dir="ltr">ebooks(is_published, created_at)</code>.</li>
+<li>ضيف composite index على <code dir="ltr">downloads(user_id, expires_at)</code>.</li>
+<li>ضيف composite index على <code dir="ltr">contact_messages(is_read, created_at)</code>.</li>
+<li>راجع cascade delete واستبدله بـ restrict/soft delete للـ financial records.</li>
+<li>خزّن order snapshots كافية: ebook title, author, price, currency وقت الشراء.</li>
+</ul>
+<h1>API Consistency Recommendations</h1>
+<ul>
+<li>استخدم response envelope موحد: <code dir="ltr">data</code>, <code dir="ltr">meta</code>, <code dir="ltr">links</code>, <code dir="ltr">message</code>, <code dir="ltr">errors</code>.</li>
+<li>استخدم <code dir="ltr">JsonResource</code> بدل raw models/arrays.</li>
+<li>وحّد status codes: <code dir="ltr">201</code> للإنشاء، <code dir="ltr">204</code> للحذف، <code dir="ltr">409</code> للتكرار، <code dir="ltr">422</code> للvalidation.</li>
+<li>طبّق pagination على كل list endpoints.</li>
+<li>اعمل validation للـ filters/sorts/per_page.</li>
+<li>وثّق API بـ OpenAPI/Swagger.</li>
+<li>اعمل route names واضحة لكل endpoints.</li>
+<li>طبّق throttling حسب نوع endpoint.</li>
+<li>افصل public/admin/user resources عشان field exposure يبقى واضح.</li>
+<li>رجّع errors موحدة من exception handler.</li>
+</ul>
+<h1>Immediate Action Plan</h1>
+<ol>
+<li>1. اقفل storage runtime exposure واتأكد من <code dir="ltr">route:list</code> بعد cache rebuild.</li>
+<li>2. شيل secret/full payload logging من Paymob webhook.</li>
+<li>3. استخدم <code dir="ltr">orders.amount</code> في payment initiation.</li>
+<li>4. تحقق من Paymob webhook invariants قبل marking paid.</li>
+<li>5. حدّث vulnerable dependencies وشغّل audit تاني.</li>
+<li>6. طبّق rate limiting على auth/contact/payment/download routes.</li>
+<li>7. شيل <code dir="ltr">role</code> و<code dir="ltr">email_verified_at</code> من public mass assignment paths.</li>
+<li>8. امنع seed demo accounts من production.</li>
+<li>9. أصلح admin order routes غير implemented.</li>
+<li>10. ابدأ test suite للـ critical flows.</li>
+</ol>
+<h1>30-Day Improvement Plan</h1>
+<ol>
+<li>1. ابني services/actions للـ checkout/payment/webhook/download.</li>
+<li>2. أضف DB constraints/indexes بعد data review.</li>
+<li>3. طبّق API resources وconsistent response envelope.</li>
+<li>4. أضف centralized exception handling وrequest IDs.</li>
+<li>5. أضف CI pipeline لـ tests, Pint, composer audit.</li>
+<li>6. أضف queue jobs للـ emails/reconciliation/cleanup.</li>
+<li>7. وثّق production env contract.</li>
+<li>8. أضف audit logs sanitized للأفعال الحساسة.</li>
+<li>9. اعمل OpenAPI documentation.</li>
+<li>10. نفذ soft delete/archive للـ ebooks.</li>
+</ol>
+<h1>90-Day Improvement Plan</h1>
+<ol>
+<li>1. Monitoring/alerting كامل للـ API/payment/queues.</li>
+<li>2. Security regression suite للـ auth/webhooks/downloads.</li>
+<li>3. Performance/load testing pipeline.</li>
+<li>4. Deployment automation وrollback strategy.</li>
+<li>5. Payment reconciliation dashboard/job.</li>
+<li>6. Access review للـ admin operations.</li>
+<li>7. Data retention policy للـ orders/downloads/logs.</li>
+<li>8. Dependency update cadence شهري.</li>
+<li>9. Threat model رسمي للـ checkout/download flows.</li>
+<li>10. Incident response runbook.</li>
+</ol>
+<h1>Final Scores</h1>
+<h2 class="">Architecture Score (4/10)</h2>
+<p>الهيكل الأساسي Laravel واضح، لكن business logic متكدس في controllers/routes، وفيه refactor جزئي غير مكتمل للـ policies/resources. مفيش service layer كافي غير Paymob/Download، ومفيش boundaries واضحة للـ checkout/payment.</p>
+<h2 class="">Security Score (3/10)</h2>
+<p>فيه مشاكل حرجة في webhook logging، payment integrity، dependency advisories، rate limiting، mass assignment، وruntime storage routes. بعض التحسينات بدأت تظهر في worktree لكنها مش مكتملة ولا مثبتة بتستات.</p>
+<h2 class="">Performance Score (4/10)</h2>
+<p>الاستعلامات بسيطة حاليا، لكن مفيش indexes كفاية، فيه endpoints غير paginated، وPaymob calls synchronous بدون timeout/retry. الأداء هيضعف بسرعة مع نمو البيانات.</p>
+<h2 class="">Code Quality Score (4/10)</h2>
+<p>Pint فشل على ملفات كتير، وفيه mixed comments/style وraw arrays بدل resources، لكن الكود صغير ومفهوم كبداية MVP.</p>
+<h2 class="">Maintainability Score (4/10)</h2>
+<p>غياب tests حقيقية وcentralized error handling وAPI resources بيخلي أي تعديل عالي المخاطر. وجود partial untracked refactor بيزود الغموض.</p>
+<h2 class="">Scalability Score (3/10)</h2>
+<p>مفيش jobs فعلية، queue/cache defaults مش production-grade، ولا CI/CD أو deployment artifacts. Payment/download flows مش مصممة لتحمل latency أو concurrency.</p>
+<h2 class="">Production Readiness Score (2/10)</h2>
+<p>Dependencies فيها advisories، env template dev-biased، مفيش CI/CD، tests scaffold-only، ومفيش monitoring/audit trail. لا يُنصح بإطلاق production قبل remediation.</p>
+<h2 class="">Overall Score (3/10)</h2>
+<p>المشروع مناسب كـ MVP/learning backend، لكنه مش جاهز production بسبب security/payment/testing/deployment gaps الأساسية.</p></body></html>
