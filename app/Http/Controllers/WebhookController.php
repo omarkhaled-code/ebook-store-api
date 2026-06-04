@@ -35,7 +35,7 @@ class WebhookController extends Controller
         if ($order->status === 'paid') {
             return response()->json(['status' => 'already processed']);
         }
-        
+      
         $order->update([
             'status'                => 'paid',
             'paymob_transaction_id' => $data['id'],
