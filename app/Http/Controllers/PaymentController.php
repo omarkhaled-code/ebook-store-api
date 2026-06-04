@@ -18,12 +18,16 @@ class PaymentController extends Controller
 
     public function initiate(InitiatePaymentRequest $request)
     {
+
         // Get the order — make sure it belongs to this user
         $order = Order::where('id', $request->order_id)
             ->where('user_id', auth()->id())
             ->where('status', 'pending')
             ->with('ebook')
             ->firstOrFail();
+
+        // تحويل آمن بدون مشاكل الـ Floating point
+        $amountCents = (int) bcmul((string) $order->amount, '100', 0);
 
         $user  = auth()->user();
 
@@ -51,7 +55,7 @@ class PaymentController extends Controller
             // Step 2 — Create Paymob order
             $paymobOrder = $this->paymobService->createOrder(
                 $authToken,
-                $order->ebook->price_in_cents,
+                $amountCents,
                 $order->ebook->title
             );
 
@@ -59,7 +63,7 @@ class PaymentController extends Controller
             $paymentKey = $this->paymobService->getPaymentKey(
                 $authToken,
                 $paymobOrder['id'],
-                $order->ebook->price_in_cents,
+                $amountCents,
                 $billingData
             );
 
@@ -73,7 +77,6 @@ class PaymentController extends Controller
                 'iframe_url'  => $this->paymobService->getIframeUrl($paymentKey),
                 'order_id'    => $order->id,
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Payment initiation failed. Please try again.',

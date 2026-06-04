@@ -33,6 +33,7 @@ Route::prefix('v1')->group(function () {
     // Public ebook routes — anyone can browse
     Route::prefix('ebooks')->group(function () {
         Route::get('/', [EbookController::class, 'index']);
+        Route::get('featured', [EbookController::class, 'featured']);
         Route::get('{slug}', [EbookController::class, 'show']);
     });
 
