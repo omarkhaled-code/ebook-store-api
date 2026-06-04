@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EbookController;
 use App\Http\Controllers\Admin\AdminEbookController;
+use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\DashboardController;
@@ -42,6 +43,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('ebooks', AdminEbookController::class);
         Route::patch('ebooks/{id}/toggle-publish', [AdminEbookController::class, 'togglePublish']);
         Route::apiResource('orders', AdminOrderController::class);
+        Route::get('notifications', [AdminNotificationController::class, 'index']);
+        Route::patch('notifications/{id}/read', [AdminNotificationController::class, 'markRead']);
+        Route::patch('notifications/read-all', [AdminNotificationController::class, 'markAllRead']);
     });
 
 
