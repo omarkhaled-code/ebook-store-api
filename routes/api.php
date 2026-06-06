@@ -99,6 +99,7 @@ Route::prefix('v1')->group(function () {
             return response()->json(['message' => 'Verification email sent.']);
         });
 
+
         Route::get('/messages', [ContactMessageController::class, 'index']);
         Route::delete('/messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
     });
@@ -106,4 +107,4 @@ Route::prefix('v1')->group(function () {
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
-});
+

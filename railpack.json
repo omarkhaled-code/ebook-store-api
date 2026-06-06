@@ -1,6 +1,15 @@
 {
+
+  "builder": "heroku-22",
+  "buildpacks": [
+    "heroku/php",
+    "heroku/nodejs"
+  ]
+}
+
   "$schema": "https://schema.railpack.com",
   "packages": {
     "php": "8.4"
   }
 }
+
