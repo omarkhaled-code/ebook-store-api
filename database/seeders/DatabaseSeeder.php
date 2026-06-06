@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Ebook;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -19,10 +20,20 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Admin Account',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('password'),
+            "role" => 'admin',
         ]);
 
-        Ebook::factory()->count(30)->create();
+        User::factory()->create([
+            'name' => 'User Account',
+            'email' => 'user@example.com',
+            'password' => bcrypt('password'),
+            "role" => 'user',
+        ]);
+
+        Ebook::factory()->count(35)->create();
+        Order::factory()->count(100)->create();
     }
 }

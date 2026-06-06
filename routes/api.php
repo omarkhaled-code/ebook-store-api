@@ -5,10 +5,14 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EbookController;
 use App\Http\Controllers\Admin\AdminEbookController;
+use App\Http\Controllers\Admin\AdminNotificationController;
+use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\UserSettingsController;
 use App\Http\Controllers\WebhookController;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -30,17 +34,31 @@ Route::prefix('v1')->group(function () {
     // Public ebook routes — anyone can browse
     Route::prefix('ebooks')->group(function () {
         Route::get('/', [EbookController::class, 'index']);
+        Route::get('featured', [EbookController::class, 'featured']);
         Route::get('{slug}', [EbookController::class, 'show']);
     });
 
     // Admin ebook routes — must be logged in AND be an admin
     Route::prefix('admin')->middleware(['auth:sanctum', 'auth.admin'])->group(function () {
         Route::apiResource('ebooks', AdminEbookController::class);
+        Route::patch('ebooks/{id}/toggle-publish', [AdminEbookController::class, 'togglePublish']);
+        Route::apiResource('orders', AdminOrderController::class);
+        Route::get('notifications', [AdminNotificationController::class, 'index']);
+        Route::patch('notifications/{id}/read', [AdminNotificationController::class, 'markRead']);
+        Route::patch('notifications/read-all', [AdminNotificationController::class, 'markAllRead']);
     });
 
+
     Route::middleware('auth:sanctum')->group(function () {
+        // User settings routes
+        Route::put('user/profile', [UserSettingsController::class, 'updateProfile']);
+        Route::put('user/password', [UserSettingsController::class, 'updatePassword']);
+
         Route::post('orders', [OrderController::class, 'store']);
         Route::get('orders/{id}', [OrderController::class, 'show']);
+
+
+
         Route::post('payments/initiate', [PaymentController::class, 'initiate']);
 
         Route::post('downloads/generate/{order_id}', [DownloadController::class, 'generate']);
@@ -80,13 +98,23 @@ Route::prefix('v1')->group(function () {
 
             return response()->json(['message' => 'Verification email sent.']);
         });
+<<<<<<< HEAD
+=======
+
+        Route::get('/messages', [ContactMessageController::class, 'index']);
+        Route::delete('/messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
+>>>>>>> 82bea02f490c36b51c206f5800bd626f6aa1e70b
     });
+    Route::post('/messages', [ContactMessageController::class, 'store']);
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
 });
+<<<<<<< HEAD
 
 
 
 
 
+=======
+>>>>>>> 82bea02f490c36b51c206f5800bd626f6aa1e70b

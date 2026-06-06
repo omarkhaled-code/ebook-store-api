@@ -11,12 +11,12 @@ class EbookFactory extends Factory
     {
         $title = fake()->sentence(3);
 
-        $price = fake()->numberBetween(10, 200);
+        $price = fake()->numberBetween(150, 2000);
 
         return [
             'title' => $title,
             'slug' => Str::slug($title . '-' . fake()->unique()->numberBetween(1, 9999)),
-            'description' => fake()->paragraph(5),
+            'description' => fake()->paragraph(10),
             'author' => fake()->name(),
             'pdf_path' => 'pdfs/sample.pdf',
             'price' => $price,
