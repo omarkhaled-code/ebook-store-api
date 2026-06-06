@@ -12,7 +12,7 @@ class OrderFactory extends Factory
     {
         return [
             'user_id'               => User::factory(),
-            'ebook_id'              => fake()->numberBetween(1, 35), // Assuming you have 35 ebooks from the seeder
+            'ebook_id'              => fake()->numberBetween(1, 5), // Assuming you have 5 ebooks from the seeder
             'paymob_order_id'       => null,
             'paymob_transaction_id' => null,
             'amount'                => Ebook::factory()->create()->price,
