@@ -68,7 +68,7 @@ class AdminEbookController extends Controller
             'description' => ['sometimes', 'string'],
             'author'      => ['sometimes', 'string', 'max:255'],
             'price'       => ['sometimes', 'numeric', 'min:0'],
-            'is_published'=> ['sometimes', 'boolean'],
+            'is_published' => ['sometimes', 'boolean'],
         ]);
 
         // Update slug if title changed
@@ -118,6 +118,17 @@ class AdminEbookController extends Controller
     {
         return response()->json([
             'data' => $ebook
+        ]);
+    }
+
+    public function togglePublish(int $id)
+    {
+        $ebook = Ebook::findOrFail($id);
+        $ebook->update(['is_published' => !$ebook->is_published]);
+
+        return response()->json([
+            'message'      => $ebook->is_published ? 'Ebook published.' : 'Ebook unpublished.',
+            'is_published' => $ebook->is_published,
         ]);
     }
 }

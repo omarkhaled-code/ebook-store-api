@@ -27,4 +27,15 @@ class EbookController extends Controller
             'data' => $ebook
         ]);
     }
+
+    public function featured()
+    {
+        $ebooks = Ebook::where('is_published', true)
+            ->whereHas('orders', function ($query) {
+                $query->havingRaw('COUNT(*) > 1');
+            })
+            ->latest()
+            ->paginate(8);
+        return response()->json($ebooks);
+    }
 }
