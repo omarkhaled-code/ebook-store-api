@@ -98,23 +98,13 @@ Route::prefix('v1')->group(function () {
 
             return response()->json(['message' => 'Verification email sent.']);
         });
-<<<<<<< HEAD
-=======
+
 
         Route::get('/messages', [ContactMessageController::class, 'index']);
         Route::delete('/messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
->>>>>>> 82bea02f490c36b51c206f5800bd626f6aa1e70b
     });
     Route::post('/messages', [ContactMessageController::class, 'store']);
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
 });
-<<<<<<< HEAD
-
-
-
-
-
-=======
->>>>>>> 82bea02f490c36b51c206f5800bd626f6aa1e70b
