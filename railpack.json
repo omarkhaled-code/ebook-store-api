@@ -6,7 +6,8 @@
     "packages": {
         "php": "8.4",
         "apt": {
-            "build": ["bison", "flex", "autoconf", "make", "g++"]
+            "build": ["bison", "flex", "autoconf", "make", "g++"],
+            "runtime": ["bison"]
         }
     }
 }
