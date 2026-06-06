@@ -17,7 +17,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
 
         User::factory()->create([
             'name' => 'Admin Account',
@@ -33,7 +32,7 @@ class DatabaseSeeder extends Seeder
             "role" => 'user',
         ]);
 
-        Ebook::factory()->count(35)->create();
+        Ebook::factory()->count(30)->create();
         Order::factory()->count(100)->create();
     }
 }

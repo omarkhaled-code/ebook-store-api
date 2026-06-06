@@ -102,7 +102,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/messages', [ContactMessageController::class, 'index']);
         Route::delete('/messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
     });
-    
+
     Route::post('/messages', [ContactMessageController::class, 'store']);
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
