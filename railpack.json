@@ -1,7 +1,0 @@
-{
-  "builder": "heroku-22",
-  "buildpacks": [
-    "heroku/php",
-    "heroku/nodejs"
-  ]
-}
