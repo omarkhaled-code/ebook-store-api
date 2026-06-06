@@ -107,4 +107,4 @@ Route::prefix('v1')->group(function () {
 
     Route::post('webhooks/paymob', [WebhookController::class, 'handlePaymob'])
         ->middleware('verify.paymob.webhook');
-
+});
